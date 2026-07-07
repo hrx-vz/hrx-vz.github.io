@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Net-Hunter: Cyber Plano Global</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            touch-action: none;
+        }
+        body {
+            background-color: #020406;
+            color: #e2e8f0;
+            font-family: 'Courier New', Courier, monospace;
+            overflow: hidden;
+            /* Solución al problema de desborde visto en 1000004466.png usando dvh */
+            width: 100vw;
+            height: 100dvh; 
+            position: relative;
+        }
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: calc(10px + env(safe-area-inset-top)) calc(15px + env(safe-area-inset-right)) calc(20px + env(safe-area-inset-bottom)) calc(15px + env(safe-area-inset-left));
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        /* --- HUD SUPERIOR (RESPONSIVO) --- */
+        .hud-operator {
+            position: relative;
+            background: rgba(4, 7, 12, 0.9);
+            border: 1px solid #1e293b;
+            border-radius: 8px;
+            padding: 12px;
+            width: 100%;
+            max-width: 280px;
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.08);
+            z-index: 10;
+        }
+        .hud-title { font-size: 10px; letter-spacing: 2px; color: #64748b; text-transform: uppercase; }
+        .hud-status { font-size: 14px; font-weight: bold; color: #00ffcc; margin-bottom: 6px; }
+        .bar-container { background: #0f172a; border-radius: 4px; height: 5px; width: 100%; margin-bottom: 5px; overflow: hidden; }
+        .bar-hp { width: 100%; height: 100%; background: #00ff66; }
+        .bar-energy { width: 100%; height: 100%; background: #38bdf8; }
+        .hud-stats { font-size: 11px; color: #94a3b8; display: flex; justify-content: space-between; }
+
+        /* --- CONTENEDOR INFERIOR INTERACTIVO --- */
+        .bottom-ui-wrapper {
+            position: relative;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        /* --- JOYSTICK VIRTUAL PARA MÓVILES --- */
+        .joystick-zone {
+            width: 100px;
+            height: 100px;
+            background: rgba(15, 23, 42, 0.4);
+            border: 2px dashed #334155;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: auto;
+        }
+        .joystick-handle {
+            width: 40px;
+            height: 40px;
+            background: rgba(0, 255, 204, 0.2);
+            border: 2px solid #00ffcc;
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(0, 255, 204, 0.5);
+        }
+
+        /* --- GRID DE HABILIDADES OPTIMIZADO (NUNCA SE DESBORDA) --- */
+        .skills-grid {
+            display: grid;
+            grid-template-columns: repeat(2, min(65px, 15vw));
+            grid-gap: 8px;
+            pointer-events: auto;
+        }
+        .skill-btn {
+            aspect-ratio: 1;
+            background: rgba(10, 16, 28, 0.95);
+            border: 1px solid #334155;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+        }
+        .skill-btn:active { transform: scale(0.95); border-color: #00ffcc; }
+        .skill-icon { font-size: 18px; margin-bottom: 2px; }
+        .skill-name { font-size: 8px; color: #94a3b8; text-transform: uppercase; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <canvas id="cyberCanvas"></canvas>
+
+    <div id="game-container">
+        <!-- HUD Superior -->
+        <div class="hud-operator">
+            <div class="hud-title">Nodo Operador</div>
+            <div class="hud-status" id="status-text">[DISCRETO]</div>
+            <div class="bar-container"><div class="bar-hp" id="hp-bar"></div></div>
+            <div class="bar-container"><div class="bar-energy" id="energy-bar"></div></div>
+            <div class="hud-stats">
+                <span id="coord-txt">LOC: X:0 Y:0</span>
+                <span id="score-txt">💰 000</span>
+            </div>
+        </div>
+
+        <!-- Zona Inferior: Controladores e Interfaz Protegida -->
+        <div class="bottom-ui-wrapper">
+            <!-- Slider/Joystick Virtual Táctil -->
+            <div class="joystick-zone" id="touch-joystick">
+                <div class="joystick-handle" id="joystick-inner"></div>
+            </div>
+
+            <!-- Panel de Habilidades Esenciales -->
+            <div class="skills-grid">
+                <div class="skill-btn" onclick="triggerSkill('fantasma')">
+                    <span class="skill-icon">👻</span>
+                    <span class="skill-name">Ghost</span>
+                </div>
+                <div class="skill-btn" onclick="triggerSkill('escudo')">
+                    <span class="skill-icon">🛡️</span>
+                    <span class="skill-name">Shield</span>
+                </div>
+                <div class="skill-btn" onclick="triggerSkill('ayuda')">
+                    <span class="skill-icon">☠️</span>
+                    <span class="skill-name">S.O.S</span>
+                </div>
+                <div class="skill-btn" onclick="triggerSkill('salto')">
+                    <span class="skill-icon">🌌</span>
+                    <span class="skill-name">Jump</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('cyberCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // --- SISTEMA DE CÁMARA (ESPACIO EXPANDIBLE GLOBAL) ---
+        const camera = { x: 2000, y: 2000 };
+
+        // --- CONFIGURACIÓN DEL JUGADOR ANÓNIMO ---
+        const player = {
+            worldX: 2300,
+            worldY: 2300,
+            radius: 24,
+            speed: 5,
+            hp: 100,
+            energy: 100,
+            score: 0,
+            isInvisible: false,
+            shieldActive: false,
+            shieldTime: 0,
+            isTrapped: false,
+            trapFactor: 1.0
+        };
+
+        // --- CONTROLES DE TECLADO (PC) ---
+        const keys = { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
+        window.addEventListener('keydown', (e) => { if(e.key in keys) keys[e.key] = true; });
+        window.addEventListener('keyup', (e) => { if(e.key in keys) keys[e.key] = false; });
+
+        // --- CONTROLES MÓVILES (JOYSTICK DESLIZABLE) ---
+        const joyZone = document.getElementById('touch-joystick');
+        const joyHandle = document.getElementById('joystick-inner');
+        let joyActive = false;
+        let joyVector = { x: 0, y: 0 };
+
+        joyZone.addEventListener('pointerdown', (e) => { joyActive = true; handleJoyMove(e); });
+        window.addEventListener('pointermove', (e) => { if (joyActive) handleJoyMove(e); });
+        window.addEventListener('pointerup', () => {
+            joyActive = false;
+            joyVector = { x: 0, y: 0 };
+            joyHandle.style.transform = 'translate(0px, 0px)';
+        });
+
+        function handleJoyMove(e) {
+            const rect = joyZone.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            let dx = e.clientX - centerX;
+            let dy = e.clientY - centerY;
+            const maxDist = rect.width / 2;
+            const dist = Math.hypot(dx, dy);
+
+            if (dist > maxDist) {
+                dx = (dx / dist) * maxDist;
+                dy = (dy / dist) * maxDist;
+            }
+            joyHandle.style.transform = `translate(${dx}px, ${dy}px)`;
+            joyVector.x = dx / maxDist;
+            joyVector.y = dy / maxDist;
+        }
+
+        // --- MAPA MUNDIAL DIGITAL: AGENCIAS Y NODOS DE INTERÉS ---
+        const worldNodes = [
+            // Zonas Militares/Prohibidas Estratégicas
+            { worldX: 1200, worldY: 1400, radius: 45, name: 'AREA-51', flag: '🇺🇸', color: '#f59e0b', label: 'ACCESO MILITAR PROHIBIDO', power: 5.0, hp: 400, maxHp: 400 },
+            { worldX: 2500, worldY: 1100, radius: 50, name: 'PENTÁGONO', flag: '🇺🇸', color: '#ef4444', label: 'PRESA CRÍTICA SECTOR ALPHA', power: 6.0, hp: 500, maxHp: 500 },
+            { worldX: 3800, worldY: 1800, radius: 40, name: 'KREMLIN-NET', flag: '🇷🇺', color: '#d946ef', label: 'CONTRAMEDIDA ACTIVA', power: 4.8, hp: 300, maxHp: 300 },
+            // Nodos Regiones/Países convencionales
+            { worldX: 1800, worldY: 2800, radius: 35, name: 'PROXY-MX', flag: '🇲🇽', color: '#10b981', label: 'REPOSITORIO SUB-ESTACIÓN', power: 2.0, hp: 100, maxHp: 100 },
+            { worldX: 3100, worldY: 3200, radius: 35, name: 'SINGAPORE-HUB', flag: '🇸🇬', color: '#06b6d4', label: 'RASTREADOR BACKBONE', power: 3.5, hp: 200, maxHp: 200 }
+        ];
+
+        // --- SISTEMA DE ALIANZAS DE HACKERS (DECORADOS E IMPONENTES) ---
+        const allies = [];
+        const poolAlliesConfig = [
+            { name: 'ANON-PHREAK', prefix: '☠️', color: '#00ffff', power: 'Avanzado', radius: 25 },
+            { name: 'CERO-SQUAD', prefix: '🟢', color: '#10b981', power: 'Élite Global', radius: 32 }, // Estilo imponente
+            { name: 'NULL-SECTOR', prefix: '🦾', color: '#6366f1', power: 'Básico', radius: 20 }
+        ];
+
+        const electricBeams = [];
+
+        // --- ACCIONES EN PANTALLA PARA ATAQUES ELÉCTRICOS (EXTRAS) ---
+        window.addEventListener('pointerdown', (e) => {
+            // Prevenir ataques si clica UI física
+            if (e.clientY > window.innerHeight - 140) return;
+            if (e.clientX < 300 && e.clientY < 150) return;
+
+            // Traducir coordenadas de pantalla a coordenadas del mundo infinito
+            const worldTargetX = e.clientX + camera.x;
+            const worldTargetY = e.clientY + camera.y;
+
+            worldNodes.forEach(node => {
+                if (Math.hypot(worldTargetX - node.worldX, worldTargetY - node.worldY) < node.radius + 20) {
+                    executeElectricBeam(node);
+                }
+            });
+        });
+
+        function executeElectricBeam(node) {
+            if (player.energy < 20 || player.isTrapped) return;
+            player.energy -= 20;
+
+            electricBeams.push({
+                startX: player.worldX, startY: player.worldY,
+                endX: node.worldX, endY: node.worldY,
+                life: 15, nodeTarget: node
+            });
+
+            node.hp -= 35;
+            if (node.hp <= 0) {
+                player.score += Math.floor(node.power * 150);
+                node.hp = node.maxHp; // Reiniciar servidor (Simulación de re-arranque de la agencia)
+            }
+        }
+
+        function triggerSkill(type) {
+            if (type === 'fantasma' && player.energy >= 30) {
+                player.isInvisible = true; player.energy -= 30;
+                setTimeout(() => player.isInvisible = false, 4000);
+            }
+            if (type === 'escudo' && player.energy >= 25) {
+                player.shieldActive = true; player.shieldTime = 240; player.energy -= 25;
+            }
+            if (type === 'salto') {
+                // Desaparecer y reaparecer 300px más adelante en la dirección que navega
+                let angle = joyActive ? Math.atan2(joyVector.y, joyVector.x) : Math.PI;
+                player.worldX += Math.cos(angle) * 350;
+                player.worldY += Math.sin(angle) * 350;
+            }
+            if (type === 'ayuda' && player.energy >= 40) {
+                player.energy -= 40;
+                const config = poolAlliesConfig[Math.floor(Math.random() * poolAlliesConfig.length)];
+                allies.push({
+                    worldX: player.worldX + (Math.random() * 400 - 200),
+                    worldY: player.worldY + 400,
+                    ...config,
+                    life: 400
+                });
+            }
+        }
+
+        // --- BUCLE DE RENDERIZADO DEL PLANO DIGITAL ---
+        function loop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. Entrada de navegación (Teclado + Joystick)
+            let mx = 0; let my = 0;
+            if (keys.ArrowUp) my = -1; if (keys.ArrowDown) my = 1;
+            if (keys.ArrowLeft) mx = -1; if (keys.ArrowRight) mx = 1;
+            if (joyActive) { mx = joyVector.x; my = joyVector.y; }
+
+            const currentSpeed = player.speed * player.trapFactor;
+            player.worldX += mx * currentSpeed;
+            player.worldY += my * currentSpeed;
+
+            // Actualización fluida de la Cámara para expandir el ciberespacio al tocar bordes
+            camera.x += (player.worldX - (camera.x + canvas.width / 2)) * 0.08;
+            camera.y += (player.worldY - (camera.y + canvas.height / 2)) * 0.08;
+
+            // 2. Dibujar Red de Datos del Fondo (Matriz infinita)
+            ctx.strokeStyle = '#0a1424'; ctx.lineWidth = 1;
+            const gridSize = 60;
+            const startGridX = Math.floor(camera.x / gridSize) * gridSize;
+            const startGridY = Math.floor(camera.y / gridSize) * gridSize;
+
+            for (let x = startGridX; x < startGridX + canvas.width + gridSize; x += gridSize) {
+                ctx.beginPath(); ctx.moveTo(x - camera.x, 0); ctx.lineTo(x - camera.x, canvas.height); ctx.stroke();
+            }
+            for (let y = startGridY; y < startGridY + canvas.height + gridSize; y += gridSize) {
+                ctx.beginPath(); ctx.moveTo(0, y - camera.y); ctx.lineTo(canvas.width, y - camera.y); ctx.stroke();
+            }
+
+            // 3. Renderizar Nodos Mundiales Prohibidos y Convencionales
+            let underAttack = false;
+            worldNodes.forEach(node => {
+                const screenX = node.worldX - camera.x;
+                const screenY = node.worldY - camera.y;
+
+                // Solo dibujar si está dentro del campo de visión (Optimización)
+                if (screenX > -100 && screenX < canvas.width + 100 && screenY > -100 && screenY < canvas.height + 100) {
+                    let distance = Math.hypot(player.worldX - node.worldX, player.worldY - node.worldY);
+                    
+                    // Lazos de intercepción de Agencias
+                    if (distance < 400 && !player.isInvisible) {
+                        underAttack = true;
+                        ctx.save();
+                        ctx.beginPath(); ctx.moveTo(player.worldX - camera.x, player.worldY - camera.y); ctx.lineTo(screenX, screenY);
+                        ctx.strokeStyle = node.color; ctx.lineWidth = 2;
+                        ctx.shadowBlur = 15; ctx.shadowColor = node.color;
+                        ctx.stroke(); ctx.restore();
+
+                        if (!player.shieldActive) {
+                            player.trapFactor = 0.3; // Interferencia pesada en movimiento
+                            player.isTrapped = true;
+                            player.hp -= (node.power * 0.04);
+                        }
+                    }
+
+                    // Render Base Geométrica del Servidor Geopolítico
+                    ctx.save();
+                    ctx.shadowBlur = 15; ctx.shadowColor = node.color;
+                    ctx.strokeStyle = node.color; ctx.fillStyle = '#050a14';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath(); ctx.arc(screenX, screenY, node.radius, 0, Math.PI * 2);
+                    ctx.fill(); ctx.stroke();
+
+                    // Barra de integridad del objetivo
+                    let hpRatio = node.hp / node.maxHp;
+                    ctx.fillStyle = '#1e293b'; ctx.fillRect(screenX - 25, screenY + node.radius + 10, 50, 4);
+                    ctx.fillStyle = node.color; ctx.fillRect(screenX - 25, screenY + node.radius + 10, 50 * hpRatio, 4);
+
+                    // Tipografías de Estado Militarizado
+                    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
+                    ctx.fillText(`${node.flag} ${node.name}`, screenX, screenY + 4);
+                    ctx.fillStyle = node.color; ctx.font = 'bold 8px Courier New';
+                    ctx.fillText(node.label, screenX, screenY - node.radius - 12);
+                    ctx.restore();
+                }
+            });
+
+            if (!underAttack) { player.trapFactor = 1.0; player.isTrapped = false; }
+
+            // 4. Renderizar Hackers Aliados Convocaos (S.O.S)
+            allies.forEach((ally, index) => {
+                ally.life--;
+                const sX = ally.worldX - camera.x;
+                const sY = ally.worldY - camera.y;
+
+                // Movimiento autónomo inteligente para escoltar al jugador
+                ally.worldX += (player.worldX - ally.worldX - 80) * 0.02;
+                ally.worldY += (player.worldY - ally.worldY + 80) * 0.02;
+
+                ctx.save();
+                ctx.strokeStyle = ally.color; ctx.fillStyle = '#021814';
+                ctx.lineWidth = ally.radius > 25 ? 3 : 1.5; // Visualización más imponente si es elite
+                ctx.shadowBlur = 10; ctx.shadowColor = ally.color;
+                ctx.beginPath(); ctx.arc(sX, sY, ally.radius, 0, Math.PI*2);
+                ctx.fill(); ctx.stroke();
+
+                ctx.fillStyle = '#ffffff'; ctx.font = '9px sans-serif'; ctx.textAlign = 'center';
+                ctx.fillText(`${ally.prefix} ${ally.name}`, sX, sY + 3);
+                ctx.fillStyle = '#64748b'; ctx.font = '7px Courier New';
+                ctx.fillText(`LVL: ${ally.power}`, sX, sY - ally.radius - 6);
+                ctx.restore();
+
+                if(ally.life <= 0) allies.splice(index, 1);
+            });
+
+            // 5. Renderizar trayectoria de Rayos Eléctricos (Extras)
+            electricBeams.forEach((beam, index) => {
+                beam.life--;
+                ctx.save();
+                ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 4;
+                ctx.shadowBlur = 20; ctx.shadowColor = '#38bdf8';
+                
+                // Generación de ruido eléctrico aleatorio (trayectoria en zigzag)
+                ctx.beginPath();
+                ctx.moveTo(beam.startX - camera.x, beam.startY - camera.y);
+                
+                let steps = 4;
+                for(let i=1; i<=steps; i++) {
+                    let t = i / steps;
+                    let currX = beam.startX + (beam.endX - beam.startX) * t;
+                    let currY = beam.startY + (beam.endY - beam.startY) * t;
+                    if(i < steps) {
+                        currX += (Math.random() * 30 - 15);
+                        currY += (Math.random() * 30 - 15);
+                    }
+                    ctx.lineTo(currX - camera.x, currY - camera.y);
+                }
+                ctx.stroke(); ctx.restore();
+                if(beam.life <= 0) electricBeams.splice(index, 1);
+            });
+
+            // 6. Dibujar Jugador Anónimo (Laptop Discreta)
+            if (!player.isInvisible) {
+                const pScreenX = player.worldX - camera.x;
+                const pScreenY = player.worldY - camera.y;
+
+                ctx.save();
+                ctx.strokeStyle = player.shieldActive ? '#38bdf8' : '#00ffcc';
+                ctx.lineWidth = 3; ctx.shadowBlur = player.shieldActive ? 25 : 12;
+                ctx.shadowColor = ctx.strokeStyle;
+                ctx.fillStyle = '#030712';
+                ctx.beginPath(); ctx.arc(pScreenX, pScreenY, player.radius, 0, Math.PI * 2);
+                ctx.fill(); ctx.stroke();
+
+                if (player.shieldActive) {
+                    player.shieldTime--;
+                    ctx.beginPath(); ctx.arc(pScreenX, pScreenY, player.radius + 10, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(56, 189, 248, 0.3)'; ctx.stroke();
+                    if (player.shieldTime <= 0) player.shieldActive = false;
+                }
+
+                ctx.fillStyle = '#ffffff'; ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
+                ctx.fillText('💻', pScreenX, pScreenY + 4);
+                ctx.restore();
+            }
+
+            // Actualizar HUD Físico Seguro
+            if (player.energy < 100) player.energy += 0.15;
+            document.getElementById('hp-bar').style.width = `${Math.max(0, player.hp)}%`;
+            document.getElementById('energy-bar').style.width = `${player.energy}%`;
+            document.getElementById('coord-txt').innerText = `GRID: X:${Math.floor(player.worldX)} Y:${Math.floor(player.worldY)}`;
+            document.getElementById('score-txt').innerText = `💰 ${player.score}`;
+
+            if(player.isTrapped && !player.shieldActive) {
+                document.getElementById('status-text').innerText = '[ALERTA INTERCEPCIÓN]';
+                document.getElementById('status-text').style.color = '#ef4444';
+            } else if (player.isInvisible) {
+                document.getElementById('status-text').innerText = '[MODO INCÓGNITO]';
+                document.getElementById('status-text').style.color = '#c084fc';
+            } else {
+                document.getElementById('status-text').innerText = '[DISCRETO]';
+                document.getElementById('status-text').style.color = '#00ffcc';
+            }
+
+            if(player.hp <= 0) {
+                alert(`CONEXIÓN EXPULSADA POR LA RED. Créditos limpios extraídos: 💰 ${player.score}`);
+                player.hp = 100; player.score = 0; player.worldX = 2300; player.worldY = 2300;
+            }
+
+            requestAnimationFrame(loop);
+        }
+        requestAnimationFrame(loop);
+    </script>
+</body>
+</html>

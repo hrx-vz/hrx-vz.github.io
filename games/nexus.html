@@ -1,0 +1,1199 @@
+ <!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CeroCloud // Proyecto NEXUS</title>
+    <style>
+        :root {
+            --bg-color: #050505;
+            --neon-cyan: #00ffff;
+            --neon-green: #00ff00;
+            --neon-red: #ff3333;
+            --neon-orange: #ff9900;
+            --text-muted: #888888;
+            --card-bg: rgba(15, 15, 15, 0.9);
+        }
+
+        /* Estabilidad Tipográfica Garantizada para todos los navegadores */
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            margin: 0;
+            padding: 0;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            color: #ffffff;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            display: block;
+            background-color: #030303;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* UI Overlays */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(3, 3, 3, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 10;
+            transition: opacity 0.5s ease, transform 0.5s ease;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .hidden {
+            opacity: 0;
+            pointer-events: none;
+            transform: scale(0.95);
+        }
+
+        /* Typography & Glows */
+        .neon-title {
+            font-size: 2.5rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            color: #fff;
+            text-shadow: 0 0 10px var(--neon-cyan), 0 0 20px var(--neon-cyan);
+            margin-bottom: 10px;
+        }
+
+        .neon-subtitle {
+            font-size: 1rem;
+            color: var(--neon-cyan);
+            letter-spacing: 2px;
+            margin-bottom: 30px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .story-text {
+            max-width: 600px;
+            color: #e0e0e0;
+            font-size: 1.05rem;
+            line-height: 1.6;
+            margin-bottom: 40px;
+            background: rgba(255, 255, 255, 0.03);
+            padding: 25px;
+            border-top: 2px solid var(--neon-cyan);
+            border-bottom: 2px solid var(--neon-cyan);
+            border-radius: 4px;
+            text-align: center;
+            box-shadow: inset 0 0 20px rgba(0, 255, 255, 0.05);
+        }
+
+        /* Buttons */
+        .btn-nexus {
+            background: transparent;
+            border: 2px solid var(--neon-cyan);
+            color: #fff;
+            padding: 14px 40px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            border-radius: 4px;
+            cursor: pointer;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-nexus:hover {
+            background: var(--neon-cyan);
+            color: #000;
+            box-shadow: 0 0 25px var(--neon-cyan);
+            transform: translateY(-2px);
+        }
+
+        /* Game HUD */
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .hud-item {
+            background: rgba(10, 10, 10, 0.7);
+            padding: 10px 20px;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-family: monospace;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .bar-container {
+            width: 120px;
+            height: 10px;
+            background: #222;
+            border-radius: 5px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .bar-fill {
+            height: 100%;
+            width: 0%;
+            transition: width 0.1s ease;
+        }
+
+        #temp-fill { background: var(--neon-orange); box-shadow: 0 0 8px var(--neon-orange); }
+
+        /* Mobile Controls */
+        #mobile-controls {
+            position: absolute;
+            bottom: 30px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 0 20px;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .mobile-btn {
+            width: 65px;
+            height: 65px;
+            border-radius: 50%;
+            background: rgba(20, 20, 20, 0.6);
+            border: 2px solid var(--neon-cyan);
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-size: 0.8rem;
+            font-weight: bold;
+            pointer-events: auto;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
+            transition: transform 0.1s, background 0.2s;
+        }
+
+        .mobile-btn:active {
+            transform: scale(0.9);
+            background: rgba(0, 255, 255, 0.3);
+        }
+
+        .mobile-btn.btn-decoy { border-color: var(--neon-green); }
+        .mobile-btn.btn-decoy:active { background: rgba(0, 255, 0, 0.3); }
+
+        #joystick-zone {
+            width: 120px;
+            height: 120px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 2px dashed rgba(0, 255, 255, 0.2);
+            border-radius: 50%;
+            position: relative;
+            pointer-events: auto;
+        }
+
+        #joystick-stick {
+            width: 45px;
+            height: 45px;
+            background: rgba(0, 255, 255, 0.4);
+            border: 2px solid var(--neon-cyan);
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+
+        /* Victory Screen Specific Styling */
+        .victory-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 800px;
+            overflow-y: auto;
+            max-height: 90vh;
+            padding-right: 5px;
+        }
+
+        .victory-container::-webkit-scrollbar {
+            width: 6px;
+        }
+        .victory-container::-webkit-scrollbar-thumb {
+            background: var(--neon-cyan);
+            border-radius: 3px;
+        }
+
+        .cards-wrapper {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 25px;
+            width: 100%;
+            margin-top: 25px;
+            margin-bottom: 30px;
+        }
+
+        .reward-card {
+            background: var(--card-bg);
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            border-radius: 8px;
+            padding: 25px;
+            width: 320px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        .reward-card:hover {
+            border-color: var(--neon-cyan);
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.15);
+        }
+
+        .card-icon {
+            font-size: 2rem;
+            margin-bottom: 12px;
+        }
+
+        .card-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 15px;
+            color: #fff;
+        }
+
+        /* Holographic Scan */
+        .sc-frame {
+            position: relative;
+            width: 180px;
+            height: 180px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .sc-image {
+            width: 90%;
+            height: 90%;
+            object-fit: contain;
+            filter: drop-shadow(0 0 5px rgba(0, 255, 255, 0.5));
+        }
+
+        .sc-fallback {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            padding: 10px;
+        }
+
+        .scan-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: var(--neon-cyan);
+            box-shadow: 0 0 12px var(--neon-cyan);
+            animation: scanAnim 2.5s linear infinite;
+        }
+
+        @keyframes scanAnim {
+            0% { top: 0%; }
+            50% { top: 100%; }
+            100% { top: 0%; }
+        }
+
+        /* CLABE layout */
+        .clabe-box {
+            background: #111;
+            border: 1px solid #222;
+            padding: 12px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 1.05rem;
+            letter-spacing: 1.5px;
+            color: var(--neon-cyan);
+            width: 100%;
+            text-align: center;
+            margin-bottom: 15px;
+            word-break: break-all;
+        }
+
+        .btn-copy {
+            background: rgba(0, 255, 255, 0.08);
+            border: 1px solid var(--neon-cyan);
+            color: #fff;
+            padding: 10px 20px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-copy:hover {
+            background: var(--neon-cyan);
+            color: #000;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.4);
+        }
+
+        /* Toast notifications */
+        #toast {
+            position: absolute;
+            bottom: 30px;
+            background: var(--neon-green);
+            color: #000;
+            padding: 12px 25px;
+            font-weight: bold;
+            border-radius: 4px;
+            box-shadow: 0 0 15px var(--neon-green);
+            z-index: 100;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        #toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        /* Utility classes */
+        .cyan { color: var(--neon-cyan); }
+        .green { color: var(--neon-green); }
+        .orange { color: var(--neon-orange); }
+        .red { color: var(--neon-red); }
+
+        @media(max-width: 680px) {
+            .cards-wrapper {
+                flex-direction: column;
+                align-items: center;
+            }
+            .neon-title { font-size: 1.8rem; }
+            .story-text { font-size: 0.95rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <!-- HUD Indicators -->
+        <div id="hud" class="hidden">
+            <div class="hud-item"><span class="cyan">TIEMPO:</span> <span id="timer-val">60</span>s</div>
+            <div class="hud-item">
+                <span class="orange">TEMP:</span>
+                <div class="bar-container">
+                    <div id="temp-fill" class="bar-fill"></div>
+                </div>
+            </div>
+            <div class="hud-item"><span class="green">NODOS:</span> <span id="nodes-val">0</span></div>
+        </div>
+
+        <!-- Canvas Game Arena -->
+        <canvas id="canvas"></canvas>
+
+        <!-- Menu Screen (Multiverso Inmersivo) -->
+        <div id="screen-start" class="overlay">
+            <h1 class="neon-title">Proyecto NEXUS</h1>
+            <div class="neon-subtitle">Accediendo al Multiverso Digital</div>
+            <div class="story-text">
+                Bienvenido al ecosistema soberano de CeroCloud. Aquí, tu infraestructura es tu fortaleza. Navega la inmensidad, gestiona tus recursos y mantén tu nodo intacto.<br><br>
+                Eres el arquitecto de tu propia red. Evade a los rastreadores, expande tu dominio y sobrevive a la tormenta de datos. ¿Listo para la inmersión?
+            </div>
+            <button class="btn-nexus" id="btn-start-game">JUGAR AHORA</button>
+        </div>
+
+        <!-- Game Over Screen (Motivacional y Seguro) -->
+        <div id="screen-gameover" class="overlay hidden">
+            <h1 class="neon-title cyan">Simulación Pausada</h1>
+            <div class="neon-subtitle">¡ACORRALADO!</div>
+            <div class="story-text">
+                ¡Tranquilo!, los enemigos te acorralaron, solo falta un poco mas de practica para eludirlos, detente y activa tu escudo para protegerte o teletransportate con el boton de salto (detente y da clic al boton para que funcione)
+            </div>
+            <button class="btn-nexus" id="btn-restart-game">REANUDARn</button>
+        </div>
+
+        <!-- Victory Screen (The Masterpiece Piece) -->
+        <div id="screen-victory" class="overlay hidden">
+            <div class="victory-container">
+                <h1 class="neon-title green">¡Sistema Asegurado!</h1>
+                <div class="neon-subtitle">Evasión Exitosa • 100% Soberano</div>
+                
+                <p style="color: #e0e0e0; max-width: 650px; line-height: 1.5; font-size: 0.95rem;">
+                    Has neutralizado todas las amenazas de rastreo global de manera impecable. CeroCloud sigue flotando de forma invisible e impenetrable en el ciberespacio. Eres el dueño absoluto de tu infraestructura.
+                </p>
+
+                <div class="cards-wrapper">
+                    <!-- Card 1: CLABE -->
+                    <div class="reward-card">
+                        <div class="card-icon cyan">💳</div>
+                        <div class="card-title">Apoya Al desarrollador de CeroCloud</div>
+                        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px; text-align: center;">
+                            Inyecta energía directa al desarrollo copiando la clave interbancaria. Apoyo 100% independiente. spin oxxo (STP)
+                        </p>
+                        <div class="clabe-box" id="clabe-text">728969000165599905</div>
+                        <button class="btn-copy" id="btn-copy-clabe">Copiar Secuencia</button>
+                    </div>
+
+                    <!-- QR SCAN SIMULADOR -->
+                    <div class="reward-card">
+                        <div class="card-icon orange">🏪</div>
+                        <div class="card-title">APOYA AL DESARROLLADOR CEROCLOUD</div>
+                        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px; text-align: center;">
+                   	    CEROCLOUD
+                        </p>
+                        <div class="sc-frame">
+                           <a href="https://hrx-vz.github.io/logo.png" download="logocerocloud.png"> <img src="https://hrx-vz.github.io/logo_cerocloud.png" alt="Logo cerocloud" class="qr-image" onerror="this.style.display='none'; document.getElementById('qr-err').style.display='block';"></a>
+                            <div id="qr-err" class="qr-fallback" style="display:none;">
+                                
+                            </div>
+                            <div class="scan-line"></div>
+                        </div>
+                        <div style="font-family: monospace; font-size: 0.8rem; color: var(--neon-green);">MÓDULO DE ESCANEO ACTIVO</div>
+                    </div>
+                </div>
+
+                <button class="btn-nexus" id="btn-return-menu" style="border-color: var(--neon-green);">VOLVER AL INICIO</button>
+            </div>
+        </div>
+
+        <!-- Mobile UI Controls -->
+        <div id="mobile-controls" class="hidden">
+            <div id="joystick-zone">
+                <div id="joystick-stick"></div>
+            </div>
+            <div style="display: flex; gap: 15px;">
+                <div class="mobile-btn btn-decoy" id="mbtn-decoy">
+                    <span style="font-size:1.2rem;">🛡️</span>
+                    <span>BÓVEDA</span>
+                </div>
+                <div class="mobile-btn btn-teleport" id="mbtn-teleport">
+                    <span style="font-size:1.2rem;">⚡</span>
+                    <span>SALTO</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Floating Toast Notification -->
+        <div id="toast">¡CÓDIGO COPIADO AL PORTAPAPELES! 🛡️</div>
+    </div>
+
+    <script>
+        document.getElementById('btn-copy-clabe').addEventListener('click', () => {
+            const clabeText = document.getElementById('clabe-box').innerText;
+            navigator.clipboard.writeText(clabeText).then(() => {
+                const toast = document.getElementById('toast');
+                toast.style.display = 'block'; 
+                setTimeout(() => toast.style.display = 'none', 3000);
+            }).catch(err => console.error('Error al copiar: ', err));
+        });
+
+        // --- Web Audio Synth Engine ---
+        const AudioEngine = {
+            ctx: null,
+            init() {
+                if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            },
+            play(type) {
+                this.init();
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                
+                switch(type) {
+                    case 'teleport':
+                        let osc1 = this.ctx.createOscillator();
+                        let gain1 = this.ctx.createGain();
+                        osc1.type = 'sine';
+                        osc1.frequency.setValueAtTime(150, now);
+                        osc1.frequency.exponentialRampToValueAtTime(800, now + 0.15);
+                        gain1.gain.setValueAtTime(0.3, now);
+                        gain1.gain.linearRampToValueAtTime(0, now + 0.15);
+                        osc1.connect(gain1);
+                        gain1.connect(this.ctx.destination);
+                        osc1.start(now);
+                        osc1.stop(now + 0.15);
+                        break;
+                    case 'decoy':
+                        let osc2 = this.ctx.createOscillator();
+                        let gain2 = this.ctx.createGain();
+                        osc2.type = 'triangle';
+                        osc2.frequency.setValueAtTime(600, now);
+                        osc2.frequency.linearRampToValueAtTime(200, now + 0.2);
+                        gain2.gain.setValueAtTime(0.2, now);
+                        gain2.gain.linearRampToValueAtTime(0, now + 0.2);
+                        osc2.connect(gain2);
+                        gain2.connect(this.ctx.destination);
+                        osc2.start(now);
+                        osc2.stop(now + 0.2);
+                        break;
+                    case 'lan':
+                        let osc3 = this.ctx.createOscillator();
+                        let gain3 = this.ctx.createGain();
+                        osc3.type = 'sawtooth';
+                        osc3.frequency.setValueAtTime(400, now);
+                        osc3.frequency.setValueAtTime(600, now + 0.08);
+                        osc3.frequency.setValueAtTime(900, now + 0.16);
+                        gain3.gain.setValueAtTime(0.15, now);
+                        gain3.gain.linearRampToValueAtTime(0, now + 0.3);
+                        osc3.connect(gain3);
+                        gain3.connect(this.ctx.destination);
+                        osc3.start(now);
+                        osc3.stop(now + 0.3);
+                        break;
+                    case 'hit':
+                        let osc4 = this.ctx.createOscillator();
+                        let gain4 = this.ctx.createGain();
+                        osc4.type = 'square';
+                        osc4.frequency.setValueAtTime(120, now);
+                        osc4.frequency.linearRampToValueAtTime(40, now + 0.1);
+                        gain4.gain.setValueAtTime(0.2, now);
+                        gain4.gain.linearRampToValueAtTime(0, now + 0.1);
+                        osc4.connect(gain4);
+                        gain4.connect(this.ctx.destination);
+                        osc4.start(now);
+                        osc4.stop(now + 0.1);
+                        break;
+                }
+            }
+        };
+
+        // --- Setup Canvas Environment ---
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        let width, height;
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // --- Image Loading Asset ---
+        const logoImg = new Image();
+        logoImg.src = "https://raw.githubusercontent.com/hrx-vz/hrx-vz.github.io/refs/heads/main/logo_cerocloud.png";
+        let logoLoaded = false;
+        logoImg.onload = () => { logoLoaded = true; };
+
+        // --- Game Variables & Core Loop Objects ---
+        let gameState = 'start'; 
+        let gameTime = 60;
+        let timerInterval;
+        
+        let player = {
+            x: 0, y: 0, radius: 22, speed: 5,
+            vx: 0, vy: 0,
+            temp: 0, maxTemp: 100,
+            lanMode: false, lanTimer: 0,
+            decoyCooldown: 0, teleportCooldown: 0,
+            spawnShieldTimer: 0 // Nuevo escudo temporal post-teletransporte
+        };
+
+        let keys = {};
+        let enemies = [];
+        let decoys = [];
+        let items = [];
+        let particles = [];
+        let multiNodes = [];
+
+        // Touch Joystick Logic
+        let joystick = { active: false, startX: 0, startY: 0, curX: 0, curY: 0, maxDist: 50 };
+
+        // --- Controls Mapping ---
+        window.addEventListener('keydown', (e) => { keys[e.key.toLowerCase()] = true; handleAbilities(e.key.toLowerCase()); });
+        window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+
+        function handleAbilities(key) {
+            if (gameState !== 'playing') return;
+            if (key === ' ' || key === 'spacebar') triggerTeleport();
+            if (key === 'e') triggerDecoy();
+        }
+
+        // Joystick Event Listeners
+        const jZone = document.getElementById('joystick-zone');
+        const jStick = document.getElementById('joystick-stick');
+
+        jZone.addEventListener('touchstart', (e) => {
+            joystick.active = true;
+            const rect = jZone.getBoundingClientRect();
+            joystick.startX = rect.left + rect.width / 2;
+            joystick.startY = rect.top + rect.height / 2;
+            const touch = e.touches[0];
+            updateJoystick(touch.clientX, touch.clientY);
+        });
+
+        window.addEventListener('touchmove', (e) => {
+            if (!joystick.active) return;
+            const touch = e.touches[0];
+            updateJoystick(touch.clientX, touch.clientY);
+        }, { passive: false });
+
+        window.addEventListener('touchend', () => {
+            joystick.active = false;
+            player.vx = 0;
+            player.vy = 0;
+            jStick.style.left = '50%';
+            jStick.style.top = '50%';
+        });
+
+        function updateJoystick(clientX, clientY) {
+            let dx = clientX - joystick.startX;
+            let dy = clientY - joystick.startY;
+            let dist = Math.sqrt(dx*dx + dy*dy);
+            
+            if (dist > joystick.maxDist) {
+                dx = (dx / dist) * joystick.maxDist;
+                dy = (dy / dist) * joystick.maxDist;
+                dist = joystick.maxDist;
+            }
+
+            jStick.style.left = `calc(50% + ${dx}px)`;
+            jStick.style.top = `calc(50% + ${dy}px)`;
+
+            let pct = dist / joystick.maxDist;
+            let angle = Math.atan2(dy, dx);
+            let speed = player.lanMode ? player.speed * 1.6 : player.speed;
+            player.vx = Math.cos(angle) * speed * pct;
+            player.vy = Math.sin(angle) * speed * pct;
+        }
+
+        // Mobile Button Listeners
+        document.getElementById('mbtn-teleport').addEventListener('click', () => { if(gameState==='playing') triggerTeleport(); });
+        document.getElementById('mbtn-decoy').addEventListener('click', () => { if(gameState==='playing') triggerDecoy(); });
+
+        // --- Core Abilities Mechanics ---
+        function triggerTeleport() {
+            if (player.teleportCooldown > 0) return;
+            if (player.temp + 25 > player.maxTemp) return;
+
+            const oldX = player.x;
+            const oldY = player.y;
+            player.x = Math.random() * (width - 100) + 50;
+            player.y = Math.random() * (height - 100) + 50;
+
+            createExplosion(oldX, oldY, varColor('cyan'), 25);
+            createExplosion(player.x, player.y, varColor('cyan'), 15);
+
+            enemies = enemies.filter(enemy => {
+                let d = Math.hypot(enemy.x - oldX, enemy.y - oldY);
+                if (d < 130) {
+                    createExplosion(enemy.x, enemy.y, varColor('red'), 8);
+                    return false;
+                }
+                return true;
+            });
+
+            player.temp += 25;
+            player.teleportCooldown = 60; 
+            player.spawnShieldTimer = 180; // 3 Segundos (aprox 60fps) de escudo tras saltar
+            AudioEngine.play('teleport');
+        }
+
+        function triggerDecoy() {
+            if (player.decoyCooldown > 0) return;
+            if (player.temp + 15 > player.maxTemp) return;
+
+            decoys.push({
+                x: player.x,
+                y: player.y,
+                radius: player.radius * 0.9,
+                life: 180 // 3 segundos de vida
+            });
+
+            player.temp += 15;
+            player.decoyCooldown = 90;
+            AudioEngine.play('decoy');
+        }
+
+        // Helper color fetches
+        function varColor(name) {
+            if(name==='cyan') return '#00ffff';
+            if(name==='green') return '#00ff00';
+            if(name==='red') return '#ff3333';
+            if(name==='orange') return '#ff9900';
+            return '#ffffff';
+        }
+
+        function createExplosion(x, y, color, amt) {
+            for(let i=0; i<amt; i++) {
+                particles.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 8,
+                    vy: (Math.random() - 0.5) * 8,
+                    radius: Math.random() * 3 + 1,
+                    color: color,
+                    alpha: 1,
+                    decay: Math.random() * 0.03 + 0.01
+                });
+            }
+        }
+
+        // --- Game Setup Engine ---
+        function initGame() {
+            gameState = 'playing';
+            gameTime = 60;
+            enemies = [];
+            decoys = [];
+            items = [];
+            particles = [];
+            multiNodes = [];
+            
+            player.x = width / 2;
+            player.y = height / 2;
+            player.temp = 0;
+            player.lanMode = false;
+            player.lanTimer = 0;
+            player.decoyCooldown = 0;
+            player.teleportCooldown = 0;
+            player.spawnShieldTimer = 0;
+
+            document.getElementById('screen-start').classList.add('hidden');
+            document.getElementById('screen-gameover').classList.add('hidden');
+            document.getElementById('screen-victory').classList.add('hidden');
+            document.getElementById('hud').classList.remove('hidden');
+            
+            if(window.innerWidth <= 1024) {
+                document.getElementById('mobile-controls').classList.remove('hidden');
+            }
+
+            document.getElementById('timer-val').innerText = gameTime;
+            document.getElementById('nodes-val').innerText = '0';
+
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (gameState === 'playing') {
+                    gameTime--;
+                    document.getElementById('timer-val').innerText = gameTime;
+                    
+                    spawnCycle();
+
+                    if (gameTime <= 0) {
+                        endGame(true);
+                    }
+                }
+            }, 1000);
+        }
+
+        function spawnCycle() {
+            if(gameTime % 7 === 0) {
+                items.push({
+                    x: Math.random() * (width - 60) + 30,
+                    y: Math.random() * (height - 60) + 30,
+                    type: Math.random() > 0.45 ? 'coolant' : 'router',
+                    radius: 14
+                });
+            }
+            if(gameTime % 12 === 0 && multiNodes.length < 3) {
+                multiNodes.push({
+                    x: Math.random() * (width - 100) + 50,
+                    y: Math.random() * (height - 100) + 50,
+                    radius: 16,
+                    active: false
+                });
+            }
+        }
+
+        function endGame(victory) {
+            gameState = victory ? 'victory' : 'gameover';
+            clearInterval(timerInterval);
+            
+            document.getElementById('hud').classList.add('hidden');
+            document.getElementById('mobile-controls').classList.add('hidden');
+            joystick.active = false;
+
+            if (victory) {
+                document.getElementById('screen-victory').classList.remove('hidden');
+            } else {
+                document.getElementById('screen-gameover').classList.remove('hidden');
+            }
+        }
+
+        // --- Mechanics Updates ---
+        function update() {
+            if (gameState !== 'playing') return;
+
+            if(player.temp > 0) player.temp -= 0.12;
+            if(player.temp < 0) player.temp = 0;
+            document.getElementById('temp-fill').style.width = `${player.temp}%`;
+
+            if(player.temp >= player.maxTemp) {
+                endGame(false);
+                return;
+            }
+
+            if(player.decoyCooldown > 0) player.decoyCooldown--;
+            if(player.teleportCooldown > 0) player.teleportCooldown--;
+            if(player.spawnShieldTimer > 0) player.spawnShieldTimer--; // Reducir tiempo de escudo
+
+            if(player.lanMode) {
+                player.lanTimer--;
+                if(player.lanTimer <= 0) player.lanMode = false;
+            }
+
+            if (!joystick.active) {
+                let currentSpeed = player.lanMode ? player.speed * 1.6 : player.speed;
+                player.vx = 0;
+                player.vy = 0;
+                if (keys['w'] || keys['arrowup']) player.vy = -currentSpeed;
+                if (keys['s'] || keys['arrowdown']) player.vy = currentSpeed;
+                if (keys['a'] || keys['arrowleft']) player.vx = -currentSpeed;
+                if (keys['d'] || keys['arrowright']) player.vx = currentSpeed;
+
+                if (player.vx !== 0 && player.vy !== 0) {
+                    player.vx *= 0.7071;
+                    player.vy *= 0.7071;
+                }
+            }
+
+            player.x += player.vx;
+            player.y += player.vy;
+
+            if(player.x < player.radius) player.x = player.radius;
+            if(player.x > width - player.radius) player.x = width - player.radius;
+            if(player.y < player.radius) player.y = player.radius;
+            if(player.y > height - player.radius) player.y = height - player.radius;
+
+            decoys.forEach((decoy, index) => {
+                decoy.life--;
+                if (decoy.life <= 0) decoys.splice(index, 1);
+            });
+
+            items.forEach((item, index) => {
+                let d = Math.hypot(item.x - player.x, item.y - player.y);
+                if (d < player.radius + item.radius) {
+                    if (item.type === 'coolant') {
+                        player.temp = Math.max(0, player.temp - 40);
+                        AudioEngine.play('teleport');
+                    } else if (item.type === 'router') {
+                        player.lanMode = true;
+                        player.lanTimer = 420; 
+                        player.temp = Math.max(0, player.temp - 15);
+                        AudioEngine.push ? null : createExplosion(player.x, player.y, varColor('green'), 20);
+                        AudioEngine.play('lan');
+                    }
+                    items.splice(index, 1);
+                }
+            });
+
+            multiNodes.forEach(node => {
+                if(!node.active) {
+                    let d = Math.hypot(node.x - player.x, node.y - player.y);
+                    if (d < player.radius + node.radius + 30) {
+                        node.active = true;
+                        AudioEngine.play('lan');
+                        let count = parseInt(document.getElementById('nodes-val').innerText) + 1;
+                        document.getElementById('nodes-val').innerText = count;
+                        createExplosion(node.x, node.y, varColor('green'), 12);
+                    }
+                }
+            });
+
+            let targetEnemiesCount = Math.floor((60 - gameTime) / 10) + 3;
+            if(player.lanMode) targetEnemiesCount = Math.floor(targetEnemiesCount / 2);
+
+            if (enemies.length < targetEnemiesCount && Math.random() < 0.03) {
+                let sx, sy;
+                if(Math.random() > 0.5) {
+                    sx = Math.random() > 0.5 ? -20 : width + 20;
+                    sy = Math.random() * height;
+                } else {
+                    sx = Math.random() * width;
+                    sy = Math.random() > 0.5 ? -20 : height + 20;
+                }
+                enemies.push({
+                    x: sx, y: sy,
+                    radius: Math.random() * 4 + 12,
+                    speed: Math.random() * 1.5 + 2,
+                    type: Math.random() > 0.75 ? 'seeker' : 'tracker'
+                });
+            }
+
+            enemies.forEach((enemy, index) => {
+                let targetX = player.x;
+                let targetY = player.y;
+
+                if(decoys.length > 0) {
+                    targetX = decoys[0].x;
+                    targetY = decoys[0].y;
+                }
+
+                let dx = targetX - enemy.x;
+                let dy = targetY - enemy.y;
+                let dist = Math.hypot(dx, dy);
+
+                enemy.x += (dx / dist) * enemy.speed;
+                enemy.y += (dy / dist) * enemy.speed;
+
+                decoys.forEach(decoy => {
+                    let dDecoy = Math.hypot(enemy.x - decoy.x, enemy.y - decoy.y);
+                    if (dDecoy < enemy.radius + decoy.radius) {
+                        createExplosion(enemy.x, enemy.y, varColor('green'), 6);
+                        enemies.splice(index, 1);
+                    }
+                });
+
+                let dPlayer = Math.hypot(enemy.x - player.x, enemy.y - player.y);
+                if (dPlayer < enemy.radius + player.radius) {
+                    // Ahora protege si está en LAN o si el escudo de Teletransporte está activo
+                    if (player.lanMode || player.spawnShieldTimer > 0) {
+                        createExplosion(enemy.x, enemy.y, varColor('cyan'), 10);
+                        enemies.splice(index, 1);
+                        AudioEngine.play('teleport');
+                    } else {
+                        player.temp += 14;
+                        createExplosion(enemy.x, enemy.y, varColor('red'), 8);
+                        enemies.splice(index, 1);
+                        AudioEngine.play('hit');
+                    }
+                }
+            });
+
+            particles.forEach((p, idx) => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.alpha -= p.decay;
+                if(p.alpha <= 0) particles.splice(idx, 1);
+            });
+        }
+
+        // --- Render Graphics Engine ---
+        function draw() {
+            ctx.clearRect(0, 0, width, height);
+
+            ctx.strokeStyle = 'rgba(0, 255, 255, 0.025)';
+            ctx.lineWidth = 1;
+            const grid = 50;
+            for(let x=0; x<width; x+=grid) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,height); ctx.stroke(); }
+            for(let y=0; y<height; y+=grid) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(width,y); ctx.stroke(); }
+
+            if (gameState !== 'playing') return;
+
+            items.forEach(item => {
+                ctx.save();
+                ctx.shadowBlur = 10;
+                if(item.type === 'coolant') {
+                    ctx.fillStyle = varColor('orange');
+                    ctx.shadowColor = varColor('orange');
+                    ctx.beginPath();
+                    ctx.moveTo(item.x, item.y - item.radius);
+                    ctx.lineTo(item.x + item.radius, item.y);
+                    ctx.lineTo(item.x, item.y + item.radius);
+                    ctx.lineTo(item.x - item.radius, item.y);
+                    ctx.closePath();
+                    ctx.fill();
+                } else {
+                    ctx.fillStyle = varColor('green');
+                    ctx.shadowColor = varColor('green');
+                    ctx.beginPath();
+                    ctx.arc(item.x, item.y, item.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+                ctx.restore();
+            });
+
+            multiNodes.forEach(node => {
+                ctx.save();
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = node.active ? varColor('green') : '#444';
+                ctx.fillStyle = node.active ? varColor('green') : '#222';
+                ctx.strokeStyle = node.active ? '#fff' : '#555';
+                ctx.lineWidth = 2;
+                
+                ctx.beginPath();
+                ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+
+                if(node.active) {
+                    ctx.restore();
+                    ctx.save();
+                    ctx.strokeStyle = 'rgba(0, 255, 0, 0.4)';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([4, 4]);
+                    ctx.beginPath();
+                    ctx.moveTo(node.x, node.y);
+                    ctx.lineTo(player.x, player.y);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            });
+
+            decoys.forEach(decoy => {
+                ctx.save();
+                // Efecto de parpadeo cuando quedan menos de 60 frames (1 segundo)
+                if (decoy.life > 60 || Math.floor(Date.now() / 150) % 2 === 0) {
+                    ctx.strokeStyle = varColor('green');
+                    ctx.shadowColor = varColor('green');
+                    ctx.shadowBlur = 15;
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(decoy.x, decoy.y, decoy.radius, 0, Math.PI*2);
+                    ctx.stroke();
+                    
+                    ctx.strokeStyle = 'rgba(0, 255, 0, 0.2)';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.arc(decoy.x, decoy.y, decoy.radius + 15, 0, Math.PI*2);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            });
+
+            enemies.forEach(enemy => {
+                ctx.save();
+                ctx.fillStyle = enemy.type === 'seeker' ? '#ff33aa' : varColor('red');
+                ctx.shadowColor = ctx.fillStyle;
+                ctx.shadowBlur = 8;
+                
+                ctx.beginPath();
+                ctx.moveTo(enemy.x, enemy.y - enemy.radius);
+                ctx.lineTo(enemy.x + enemy.radius, enemy.y + enemy.radius);
+                ctx.lineTo(enemy.x - enemy.radius, enemy.y + enemy.radius);
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
+            });
+
+            particles.forEach(p => {
+                ctx.save();
+                ctx.globalAlpha = p.alpha;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2);
+                ctx.fill();
+                ctx.restore();
+            });
+
+            // Player Core
+            ctx.save();
+            ctx.shadowBlur = player.lanMode ? 25 : 15;
+            ctx.shadowColor = player.lanMode ? varColor('green') : varColor('cyan');
+            
+            if (logoLoaded) {
+                ctx.drawImage(logoImg, player.x - player.radius, player.y - player.radius, player.radius * 2, player.radius * 2);
+            } else {
+                ctx.fillStyle = player.lanMode ? varColor('green') : varColor('cyan');
+                ctx.beginPath();
+                ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Escudo LAN Mode (Parpadea cuando queda poco tiempo - menos de 120 frames/2 seg)
+            if(player.lanMode) {
+                if(player.lanTimer > 120 || Math.floor(Date.now() / 150) % 2 === 0) {
+                    ctx.strokeStyle = 'rgba(0, 255, 0, 0.6)';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(player.x, player.y, player.radius + 8, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+            }
+
+            // Escudo de Protección al Reaparecer (Teletransporte) (Parpadea el último segundo)
+            if(player.spawnShieldTimer > 0) {
+                if(player.spawnShieldTimer > 60 || Math.floor(Date.now() / 100) % 2 === 0) {
+                    ctx.strokeStyle = 'rgba(0, 255, 255, 0.8)';
+                    ctx.fillStyle = 'rgba(0, 255, 255, 0.2)';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(player.x, player.y, player.radius + 12, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                }
+            }
+
+            ctx.restore();
+        }
+
+        // --- Master Global Execution Loop ---
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        // --- UI Interactions Mechanics ---
+        document.getElementById('btn-start-game').addEventListener('click', () => {
+            AudioEngine.init();
+            initGame();
+        });
+
+        document.getElementById('btn-restart-game').addEventListener('click', () => {
+            initGame();
+        });
+
+        document.getElementById('btn-return-menu').addEventListener('click', () => {
+            gameState = 'start';
+            document.getElementById('screen-victory').classList.add('hidden');
+            document.getElementById('screen-start').classList.remove('hidden');
+        });
+
+        document.getElementById('btn-copy-clabe').addEventListener('click', () => {
+            const clabeVal = document.getElementById('clabe-text').innerText;
+            navigator.clipboard.writeText(clabeVal).then(() => {
+                const toast = document.getElementById('toast');
+                toast.classList.add('show');
+                setTimeout(() => { toast.classList.remove('show'); }, 2500);
+            }).catch(err => {
+                alert("Secuencia CLABE: " + clabeVal);
+            });
+        });
+
+        requestAnimationFrame(loop);
+    </script>
+</body>
+</html>
+

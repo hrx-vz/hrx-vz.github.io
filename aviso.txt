@@ -1,0 +1,1 @@
+Los juegos son recreados con IA asi que podras ver en el codigo algunas inconsistencias o mensajes ajenos al codigo.

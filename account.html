@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Configurar Servidor - Cero Cloud</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Arial, sans-serif; }
+        body { background: #f0f2f5; color: #202124; height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; transition: background 0.2s; }
+
+        body.dark { background: #18191a; color: #e8eaed; }
+        .dark .login-card { background: #242526; border: 1px solid #3e4042; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        .dark .login-input { border-color: #5f6368; color: #e8eaed; background: #3a3b3c; }
+        .dark .text-muted { color: #9aa0a6; }
+
+        .login-card { background: #ffffff; border-radius: 8px; padding: 40px; max-width: 400px; width: 100%; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid #dadce0; text-align: center; }
+        .logo-area { margin-bottom: 24px; }
+        .logo-area img { width: 64px; height: 64px; object-fit: contain; }
+        h2 { font-size: 24px; font-weight: 400; margin-bottom: 8px; }
+        .text-muted { color: #5f6368; font-size: 14px; margin-bottom: 24px; display: block; }
+        
+        .form-group { text-align: left; margin-bottom: 20px; }
+        label { display: block; font-size: 12px; font-weight: 500; margin-bottom: 6px; color: #5f6368; text-transform: uppercase; letter-spacing: 0.5px; }
+        .dark label { color: #9aa0a6; }
+        
+        .login-input { width: 100%; padding: 12px; border: 1px solid #dadce0; border-radius: 4px; font-size: 15px; outline: none; background: #fff; transition: border-color 0.15s; }
+        .login-input:focus { border-color: #1a73e8; }
+        
+        .login-btn { width: 100%; padding: 12px; background: #1a73e8; color: white; border: none; border-radius: 4px; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.2s; margin-top: 8px; }
+        .login-btn:hover { background: #1557b0; }
+        .login-btn:disabled { background: #ccc; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+
+    <div class="login-card">
+        <div class="logo-area">
+            <img src="logo_cerocloud.png" alt="Cero Cloud Logo">
+        </div>
+        <h2>Configurar Bóveda</h2>
+        <span class="text-muted">Enlaza este dispositivo a tu propio servidor de almacenamiento</span>
+
+        <div class="form-group">
+            <label>ENLACE GLOBAL O LOCAL</label>
+            <input type="text" id="wanUrl" class="login-input" placeholder="Ingrese su enlace" required>
+        </div>
+
+        <div class="form-group">
+            <label>Usuario / Correo Administrador</label>
+            <input type="text" id="email" class="login-input" placeholder="Ej: Alex o ejemploalex@gmail.com" required>
+        </div>
+
+        <div class="form-group">
+            <label>Contraseña Maestra</label>
+            <input type="password" id="password" class="login-input" placeholder="Elige una clave segura" required>
+        </div>
+
+        <button class="login-btn" id="btn-submit" onclick="inicializarServidor()">Guardar e Inicializar</button>
+    </div>
+
+    <script>
+        if(localStorage.getItem('theme') === 'dark') document.body.classList.add('dark');
+
+        async function inicializarServidor() {
+            const btn = document.getElementById('btn-submit');
+            let wan = document.getElementById('wanUrl').value.trim();
+            const usuario = document.getElementById('email').value.trim();
+            const pass = document.getElementById('password').value;
+
+            if(!wan || !usuario || !pass) {
+                alert("Por favor, llena todos los campos obligatorios.");
+                return;
+            }
+
+            // Limpieza automática de la barra diagonal al final si el usuario la pone por error
+            if(wan.endsWith('/')) wan = wan.slice(0, -1);
+
+            btn.innerText = "Conectando al servidor...";
+            btn.disabled = true;
+
+            try {
+                // Hacemos la petición de registro DIRECTAMENTE al servidor que el usuario especificó
+                const res = await fetch(`${wan}/api/registro-local`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ usuario, password: pass })
+                });
+
+                const data = await res.json();
+
+                if(res.ok && data.success) {
+                    // Guardamos la configuración de forma local en el navegador/app
+                    localStorage.setItem('cero_lan', wan);
+                    localStorage.setItem('cero_token', 'true');
+                    localStorage.setItem('cero_email', usuario);
+
+                    alert("¡Bóveda vinculada e inicializada con éxito!");
+                    window.location.href = 'index.html';
+                } else {
+                    alert(data.error || "El servidor rechazó la solicitud.");
+                    btn.innerText = "Guardar e Inicializar"; btn.disabled = false;
+                }
+            } catch(e) {
+                alert("No se pudo conectar con el servidor. Verifica que la URL sea correcta y que tu servidor esté encendido.");
+                btn.innerText = "Guardar e Inicializar"; btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
