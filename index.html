@@ -158,7 +158,7 @@
             sidebar.open { transform: translateX(0); }
             .lightbox-arrow { display: none; } /* En móvil se prioriza el deslizamiento táctil */
             .lightbox-iframe { width: 95vw; height: 75vh; }
-         }  
+         }
     </style>
 </head>
 <body class="dark">
@@ -419,36 +419,98 @@
         async function descargarSeleccionados() {
             if (elementosSeleccionados.size === 0) return;
             const targets = Array.from(elementosSeleccionados);
+            const container = document.getElementById('upload-progress-container');
 
-            for (let filename of targets) {
+            for (let i = 0; i < targets.length; i++) {
+                const filename = targets[i];
                 const archivoObj = listaArchivosGlobal.find(f => f.name === filename);
-                if (archivoObj) {
-                    try {
-                        const urlCompleta = `${baseServerUrl}${archivoObj.url}`;
-                        const response = await fetch(urlCompleta, { method: 'GET', crossOrigin: 'anonymous' });
-                        const blob = await response.blob();
-                        const blobUrl = window.URL.createObjectURL(blob);
+                if (!archivoObj) continue;
 
-                        const a = document.createElement('a');
-                        a.href = blobUrl;
-                        a.download = archivoObj.name;
-                        document.body.appendChild(a);
-                        a.click();
+                const toastId = 'download_' + Date.now() + '_' + i;
+                const toast = document.createElement('div');
+                toast.className = 'upload-toast';
+                toast.id = toastId;
+                toast.style.borderLeftColor = '#24a0ed';
 
-                        document.body.removeChild(a);
-                        window.URL.revokeObjectURL(blobUrl);
-                    } catch (err) {
-                        const a = document.createElement('a');
-                        a.href = `${baseServerUrl}${archivoObj.url}`;
-                        a.download = archivoObj.name;
-                        a.target = '_blank';
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
+                toast.innerHTML = `
+                    <div class="toast-info">
+                        <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:180px;" title="${archivoObj.name}">📥 ${archivoObj.name}</span>
+                        <span class="toast-pct">0%</span>
+                    </div>
+                    <div class="toast-bar-bg"><div class="toast-bar-fill" id="fill_${toastId}"></div></div>
+                `;
+                container.appendChild(toast);
+
+                try {
+                    const urlCompleta = `${baseServerUrl}${archivoObj.url}`;
+                    const response = await fetch(urlCompleta, { method: 'GET', crossOrigin: 'anonymous' });
+
+                    if (!response.ok) throw new Error('Respuesta de red no válida');
+
+                    const contentLength = response.headers.get('content-length');
+                    if (!contentLength) throw new Error('No se pudo determinar el tamaño del archivo');
+
+                    const totalBytes = parseInt(contentLength, 10);
+                    let bytesDescargados = 0;
+
+                    const reader = response.body.getReader();
+                    const chunks = [];
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+
+                        chunks.push(value);
+                        bytesDescargados += value.length;
+
+                        const pct = Math.round((bytesDescargados / totalBytes) * 100);
+                        toast.querySelector('.toast-pct').innerText = pct + '%';
+                        document.getElementById(`fill_${toastId}`).style.width = pct + '%';
                     }
+
+                    const u8Array = new Uint8Array(bytesDescargados);
+                    let posicion = 0;
+                    for (let chunk of chunks) {
+                        u8Array.set(chunk, posicion);
+                        posicion += chunk.length;
+                    }
+
+                    const blob = new Blob([u8Array]);
+                    const blobUrl = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = blobUrl;
+                    a.download = archivoObj.name;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(blobUrl);
+
+                    setTimeout(() => {
+                        toast.style.opacity = '0';
+                        setTimeout(() => toast.remove(), 400);
+                    }, 800);
+
+                } catch (err) {
+                    console.warn("Descarga por flujo fallida, activando mecanismo de respaldo directo:", err);
+                    toast.classList.add('error-toast');
+                    toast.style.borderLeftColor = '#e53e3e';
+                    toast.querySelector('.toast-pct').innerText = 'Fallo';
+                    toast.innerHTML += `<span style="color:#e53e3e;font-size:12px;">Iniciando descarga directa estándar...</span>`;
+
+                    const a = document.createElement('a');
+                    a.href = `${baseServerUrl}${archivoObj.url}&download=true`;
+                    a.download = archivoObj.name;
+                    a.target = '_blank';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+
+                    setTimeout(() => toast.remove(), 4000);
                 }
             }
+            deseleccionarTodos();
         }
+
 
         // FUNCIÓN RECUPERACION  PAPELERA
         async function recuperarSeleccionados() {
